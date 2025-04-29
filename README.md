@@ -1,6 +1,20 @@
 # glue-mcp
 A model context protocol (MCP) server to AWS Glue Data Catalog
 
+## Usage
+
+Once you've built a binary (see below), ensure you have your AWS credentials set.
+
+Then simply start the server:
+
+```bash
+./glue-mcp
+2025-04-29T21:25:37.623408Z  INFO glue_mcp: Metrics & logging initialised
+2025-04-29T21:25:37.623453Z  INFO glue_mcp::util: Starting server on 127.0.0.1:8000
+```
+
+The server is ready for MCP calls on port 8000.
+
 ## Development
 
 ### Nix
