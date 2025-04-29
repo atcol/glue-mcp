@@ -1,10 +1,7 @@
 pub mod util;
 use aws_config::BehaviorVersion;
 use metrics::counter;
-use rmcp::{
-    Error as McpError, RoleServer, ServerHandler, const_string, model::*, schemars,
-    service::RequestContext, tool,
-};
+use rmcp::{Error as McpError, ServerHandler, const_string, model::*, schemars, tool};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -202,89 +199,5 @@ impl ServerHandler for GlueDataCatalog {
             server_info: Implementation::from_build_env(),
             instructions: Some("This server provides a glue data catalog tool that can be used to get database and table metadata from an AWS Glue Data Catalog".to_string()),
         }
-    }
-
-    async fn read_resource(
-        &self,
-        ReadResourceRequestParam { uri }: ReadResourceRequestParam,
-        _: RequestContext<RoleServer>,
-    ) -> Result<ReadResourceResult, McpError> {
-        match uri.as_str() {
-            "str:////Users/to/some/path/" => {
-                let cwd = "/Users/to/some/path/";
-                Ok(ReadResourceResult {
-                    contents: vec![ResourceContents::text(cwd, uri)],
-                })
-            }
-            "memo://insights" => {
-                let memo = "Business Intelligence Memo\n\nAnalysis has revealed 5 key insights ...";
-                Ok(ReadResourceResult {
-                    contents: vec![ResourceContents::text(memo, uri)],
-                })
-            }
-            _ => Err(McpError::resource_not_found(
-                "resource_not_found",
-                Some(json!({
-                    "uri": uri
-                })),
-            )),
-        }
-    }
-
-    async fn list_prompts(
-        &self,
-        _request: Option<PaginatedRequestParam>,
-        _: RequestContext<RoleServer>,
-    ) -> Result<ListPromptsResult, McpError> {
-        Ok(ListPromptsResult {
-            next_cursor: None,
-            prompts: vec![Prompt::new(
-                "example_prompt",
-                Some("This is an example prompt that takes one required argument, message"),
-                Some(vec![PromptArgument {
-                    name: "message".to_string(),
-                    description: Some("A message to put in the prompt".to_string()),
-                    required: Some(true),
-                }]),
-            )],
-        })
-    }
-
-    async fn get_prompt(
-        &self,
-        GetPromptRequestParam { name, arguments }: GetPromptRequestParam,
-        _: RequestContext<RoleServer>,
-    ) -> Result<GetPromptResult, McpError> {
-        match name.as_str() {
-            "example_prompt" => {
-                let message = arguments
-                    .and_then(|json| json.get("message")?.as_str().map(|s| s.to_string()))
-                    .ok_or_else(|| {
-                        McpError::invalid_params("No message provided to example_prompt", None)
-                    })?;
-
-                let prompt =
-                    format!("This is an example prompt with your message here: '{message}'");
-                Ok(GetPromptResult {
-                    description: None,
-                    messages: vec![PromptMessage {
-                        role: PromptMessageRole::User,
-                        content: PromptMessageContent::text(prompt),
-                    }],
-                })
-            }
-            _ => Err(McpError::invalid_params("prompt not found", None)),
-        }
-    }
-
-    async fn list_resource_templates(
-        &self,
-        _request: Option<PaginatedRequestParam>,
-        _: RequestContext<RoleServer>,
-    ) -> Result<ListResourceTemplatesResult, McpError> {
-        Ok(ListResourceTemplatesResult {
-            next_cursor: None,
-            resource_templates: Vec::new(),
-        })
     }
 }
