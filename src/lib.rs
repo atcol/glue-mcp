@@ -1,4 +1,6 @@
+pub mod util;
 use aws_config::BehaviorVersion;
+use metrics::counter;
 use rmcp::{
     Error as McpError, RoleServer, ServerHandler, const_string, model::*, schemars,
     service::RequestContext, tool,
@@ -23,7 +25,7 @@ pub struct TableMetadata {
     pub columns: Vec<String>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GlueDataCatalog {
     client: aws_sdk_glue::Client,
 }
@@ -54,7 +56,10 @@ impl GlueDataCatalog {
             "Listing databases in {}",
             self.client.config().region().unwrap()
         );
+        counter!("calls.list_databases").increment(1);
+
         let response = self.client.get_databases().send().await.map_err(|e| {
+            counter!("errors.list_databases.aws_call_error").increment(1);
             McpError::internal_error(
                 "Failed to list databases",
                 Some(json!({"error": e.to_string()})),
@@ -69,6 +74,7 @@ impl GlueDataCatalog {
 
         let result = ListDatabasesResult { databases };
         let json_result = serde_json::to_value(result).map_err(|e| {
+            counter!("errors.list_databases.serde_error").increment(1);
             McpError::internal_error(
                 "Failed to serialize result",
                 Some(json!({"error": e.to_string()})),
@@ -88,6 +94,8 @@ impl GlueDataCatalog {
         database_name: String,
     ) -> Result<CallToolResult, McpError> {
         log::info!("Getting tables for database {}", database_name);
+        counter!("calls.get_database_metadata").increment(1);
+
         let response = self
             .client
             .get_tables()
@@ -95,6 +103,7 @@ impl GlueDataCatalog {
             .send()
             .await
             .map_err(|e| {
+                counter!("errors.get_database_metadata.aws_call_error").increment(1);
                 McpError::internal_error(
                     "Failed to get tables",
                     Some(json!({"error": e.to_string()})),
@@ -113,6 +122,7 @@ impl GlueDataCatalog {
         };
 
         let json_result = serde_json::to_value(result).map_err(|e| {
+            counter!("errors.get_database_metadata.serde_error").increment(1);
             McpError::internal_error(
                 "Failed to serialize result",
                 Some(json!({"error": e.to_string()})),
@@ -135,6 +145,8 @@ impl GlueDataCatalog {
         table_name: String,
     ) -> Result<CallToolResult, McpError> {
         log::info!("Getting columns for table {}", table_name);
+        counter!("calls.get_table_metadata").increment(1);
+
         let response = self
             .client
             .get_table()
@@ -143,6 +155,7 @@ impl GlueDataCatalog {
             .send()
             .await
             .map_err(|e| {
+                counter!("errors.get_table_metadata.aws_call_error").increment(1);
                 McpError::internal_error(
                     "Failed to get table metadata",
                     Some(json!({"error": e.to_string()})),
@@ -151,7 +164,8 @@ impl GlueDataCatalog {
 
         let columns = response
             .table()
-            .and_then(|table| table.storage_descriptor()).map(|sd| sd.columns())
+            .and_then(|table| table.storage_descriptor())
+            .map(|sd| sd.columns())
             .unwrap_or_default()
             .iter()
             .map(|col| col.name().into())
@@ -165,6 +179,7 @@ impl GlueDataCatalog {
         };
 
         let json_result = serde_json::to_value(result).map_err(|e| {
+            counter!("errors.get_table_metadata.serde_error").increment(1);
             McpError::internal_error(
                 "Failed to serialize result",
                 Some(json!({"error": e.to_string()})),
@@ -173,16 +188,6 @@ impl GlueDataCatalog {
 
         Ok(CallToolResult::success(vec![Content::json(json_result)?]))
     }
-
-    // #[tool(description = "Calculate the sum of two numbers")]
-    // fn sum(
-    //     &self,
-    //     #[tool(aggr)] StructRequest { a, b }: StructRequest,
-    // ) -> Result<CallToolResult, McpError> {
-    //     Ok(CallToolResult::success(vec![Content::text(
-    //         (a + b).to_string(),
-    //     )]))
-    // }
 }
 
 const_string!(Echo = "echo");
@@ -197,20 +202,6 @@ impl ServerHandler for GlueDataCatalog {
             server_info: Implementation::from_build_env(),
             instructions: Some("This server provides a glue data catalog tool that can be used to get database and table metadata from an AWS Glue Data Catalog".to_string()),
         }
-    }
-
-    async fn list_resources(
-        &self,
-        _request: Option<PaginatedRequestParam>,
-        _: RequestContext<RoleServer>,
-    ) -> Result<ListResourcesResult, McpError> {
-        Ok(ListResourcesResult {
-            resources: vec![
-                // self._create_resource_text("str:////Users/to/some/path/", "cwd"),
-                // self._create_resource_text("memo://insights", "memo-name"),
-            ],
-            next_cursor: None,
-        })
     }
 
     async fn read_resource(

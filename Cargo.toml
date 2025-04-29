@@ -17,3 +17,10 @@ tracing-log = "0.2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 aws-config = "1.6.2"
+tokio-util = "0.7.15"
+metrics = "0.24.2"
+metrics-exporter-prometheus = "0.17.0"
+metrics-util = "0.19.1"
+
+[dev-dependencies]
+ollama-rs = "0.3.0"
